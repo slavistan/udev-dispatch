@@ -49,7 +49,7 @@ fi
 # Run command. Note that runuser modifies the environment variables HOME,
 # SHELL, USER and LOGNAME to match those of the user, so these envvars will be
 # overwritten even if defined in $HOME/.environment.
-runuser -u "$USER" -- "$@"
+setsid runuser -u "$USER" -- "$@" &
 
 # TODO: Add proper parsing of command line.
 # TODO: Add -- separator signaling the end of options.

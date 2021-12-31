@@ -16,44 +16,104 @@ version() {
 	echo "udev-dispatch 0.1"
 }
 
-case "$1" in
-	-h|--help) usage; exit ;;
-	"") usage; exit 1 ;;
-	-v|--version) version; exit ;;
-esac
+unset user
+unset load_userenv
+unset load_displayenv
+unset load_displayenv_of_user
+unset detach
+while :; do
+	case "$1" in
+	-h)
+		usage
+		exit
+		;;
+	-v)
+		version
+		exit
+		;;
+	-u)
+		user="$2"
+		shift 2
+		;;
+	-e)
+		load_userenv=
+		shift
+		;;
+	-d)
+		detach=
+		shift
+		;;
+	-x)
+		if [ ${load_displayenv_of_user+x} ]; then
+			printf "udev-dispatch: Options -x and -X are mutually incompatible. Abort.\n" >&2
+			exit 1
+		fi
+		load_displayenv=
+		shift
+		;;
+	-X)
+		if [ ${load_displayenv+x} ]; then
+			printf "udev-dispatch: Options -x and -X are mutually incompatible. Abort.\n" >&2
+			exit 1
+		fi
+		load_displayenv_of_user=
+		shift
+		;;
+	--)
+		shift
+		break
+		;;
+	-?*)
+		printf "udev-dispatch: Unknown option '%s'. Abort." "$1" >&2
+		exit 1
+		;;
+	*)
+		break
+		;;
+	esac
+done
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-export USER="root"
-export HOME="/root"
-if [ "$1" = "-u" ] || [ "$1" = "-U" ]; then
-	USER="$2"
-	HOME="$(getent passwd "$USER" | cut -d: -f6)" # TODO: Catch HOMEless users
-	PATH="$PATH:$HOME/.local/bin"
+export USER="${user:-root}"
+export HOME="$(getent passwd "$USER" | cut -d: -f6)" # TODO: Catch HOMEless users
 
-	# Source user's .environment file, if it exists. This allows to recreate a
-	# user's regular environment.
-	if [ "$1" = "-U" ] && [ -f  "$HOME/.environment" ]; then
+# Load environment from user's environment file, if it exists.
+if [ ${load_userenv+x} ]; then
+	if [ -f  "$HOME/.environment" ]; then
 		userenv="$(cat "$HOME/.environment")"
 		eval "$(echo "$userenv" | sed 's/^/export /')"
 	fi
-
-	shift 2
 fi
 
-# Load display environment variables.
-if userenv_x="$(xpub 2>/dev/null)"; then
-	eval "$(echo "$userenv_x" | sed 's/^/export /')"
+# Load display environment variables, if set. Technically, the user set by -u
+# USER and the display session's user may vary. Use -X to load the display
+# environment if, and only if, both entities match.
+if [ ${load_displayenv+x} ]; then
+	if displayenv="$(xpub 2>/dev/null)"; then
+		eval "$(echo "$displayenv" | sed 's/^/export /')"
+	fi
+elif [ ${load_displayenv_of_user+x} ]; then
+	for tty in $(who | grep "^$USER" | tr -s ' ' | cut -d ' ' -f 2); do
+		if displayenv="$(xpub -t "$tty" 2>/dev/null)"; then
+			eval "$(echo "$displayenv" | sed 's/^/export /')"
+			break
+		fi
+	done
 fi
 
 # Run command. Note that runuser modifies the environment variables HOME,
 # SHELL, USER and LOGNAME to match those of the user, so these envvars will be
 # overwritten even if defined in $HOME/.environment.
-setsid runuser -u "$USER" -- "$@" &
+# setsid runuser -u "$USER" -- "$@" &
+if [ ${detach+x} ]; then
+	setsid runuser -u "$USER" -- "$@" &
+else
+	runuser -u "$USER" -- "$@"
+fi
 
-# TODO: Add proper parsing of command line.
-# TODO: Add -- separator signaling the end of options.
+# FIXME: dunst doesn't work properly when sending notifications from root
+#        Check whether that's a dunst problem or if information from xpub
+#        is erroneous.
 # TODO: Create a license file.
 # TODO: Create a man page. Check how xpub does it.
-# TODO: Add -x flag to retrieve display environment.
-# TODO: Add -X flag to retrieve display environment if its user matches USER. Requires -U.
 # TODO: Create AUR package.

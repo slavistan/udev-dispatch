@@ -27,9 +27,8 @@ export USER="root"
 export HOME="/root"
 if [ "$1" = "-u" ] || [ "$1" = "-U" ]; then
 	USER="$2"
-	if [ ! "$USER" = "root" ]; then
-		HOME="/home/$USER"
-	fi
+	HOME="$(getent passwd "$USER" | cut -d: -f6)" # TODO: Catch HOMEless users
+	PATH="$PATH:$HOME/.local/bin"
 
 	# Source user's .environment file, if it exists. This allows to recreate a
 	# user's regular environment.

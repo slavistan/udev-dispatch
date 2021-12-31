@@ -31,8 +31,8 @@ if [ "$1" = "-u" ] || [ "$1" = "-U" ]; then
 		HOME="/home/$USER"
 	fi
 
-	# Source user's .environment file, if it exists. This may modify PATH
-	# allowing to run commands from non-standard directories.
+	# Source user's .environment file, if it exists. This allows to recreate a
+	# user's regular environment.
 	if [ "$1" = "-U" ] && [ -f  "$HOME/.environment" ]; then
 		userenv="$(cat "$HOME/.environment")"
 		eval "$(echo "$userenv" | sed 's/^/export /')"

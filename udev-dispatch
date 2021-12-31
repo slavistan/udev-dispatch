@@ -111,6 +111,7 @@ else
 	runuser -u "$USER" -- "$@"
 fi
 
+# TODO: Allow concatenation of option flags (-X -u --> -Xu)
 # FIXME: dunst doesn't work properly when sending notifications from root
 #        Check whether that's a dunst problem or if information from xpub
 #        is erroneous.

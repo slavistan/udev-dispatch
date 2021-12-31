@@ -1,0 +1,60 @@
+#!/bin/sh
+
+usage() {
+	cat <<EOF
+Usage: udev-dispatch [(-u|-U) USER] COMMAND [ARGUMENT...]
+
+  -u:    Run COMMAND as USER.
+  -U:    Run COMMAND as USER within the environment defined in
+         the user's \$HOME/.environment file.
+  -h:    Print this help and exit.
+  -v:    Print version and exit.
+EOF
+}
+
+version() {
+	echo "udev-dispatch 0.1"
+}
+
+case "$1" in
+	-h|--help) usage; exit ;;
+	"") usage; exit 1 ;;
+	-v|--version) version; exit ;;
+esac
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export USER="root"
+export HOME="/root"
+if [ "$1" = "-u" ] || [ "$1" = "-U" ]; then
+	USER="$2"
+	if [ ! "$USER" = "root" ]; then
+		HOME="/home/$USER"
+	fi
+
+	# Source user's .environment file, if it exists. This may modify PATH
+	# allowing to run commands from non-standard directories.
+	if [ "$1" = "-U" ] && [ -f  "$HOME/.environment" ]; then
+		userenv="$(cat "$HOME/.environment")"
+		eval "$(echo "$userenv" | sed 's/^/export /')"
+	fi
+
+	shift 2
+fi
+
+# Load display environment variables.
+if userenv_x="$(xpub 2>/dev/null)"; then
+	eval "$(echo "$userenv_x" | sed 's/^/export /')"
+fi
+
+# Run command. Note that runuser modifies the environment variables HOME,
+# SHELL, USER and LOGNAME to match those of the user, so these envvars will be
+# overwritten even if defined in $HOME/.environment.
+runuser -u "$USER" -- "$@"
+
+# TODO: Add proper parsing of command line.
+# TODO: Add -- separator signaling the end of options.
+# TODO: Create a license file.
+# TODO: Create a man page. Check how xpub does it.
+# TODO: Add -x flag to retrieve display environment.
+# TODO: Add -X flag to retrieve display environment if its user matches USER. Requires -U.
+# TODO: Create AUR package.
